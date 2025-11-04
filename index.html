@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AutentiTrack App móvil</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: #eee;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  .phone-frame {
+    position: relative;
+    width: 210px;
+    height: 480px;
+    background: #222;
+    border-radius: 40px;
+    overflow: hidden;
+  }
+
+  .dynamic-island {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 28px;
+    background: black;
+    border-radius: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .dynamic-island .camera {
+    width: 12px;
+    height: 12px;
+    background: #222;
+    border-radius: 50%;
+    box-shadow:
+      inset 2px 2px 5px #000,
+      inset -1px -1px 3px #555;
+    position: relative;
+  }
+
+  .dynamic-island .camera::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 6px;
+    height: 6px;
+    background: #111;
+    border-radius: 50%;
+    box-shadow: 0 0 3px #fff;
+  }
+
+  .button-volume {
+    position: absolute;
+    left: -5px;
+    width: 4px;
+    height: 28px;
+    background: #333;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .button-volume.vol-up { top: 85px; }
+  .button-volume.vol-down { top: 125px; }
+
+  .button-power {
+    position: absolute;
+    right: -5px;
+    top: 105px;
+    width: 5px;
+    height: 45px;
+    background: #333;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+
+  .screen {
+    position: absolute;
+    top: 42px;
+    bottom: 20px;
+    left: 10px;
+    right: 10px;
+    background: white;
+    border-radius: 28px;
+    overflow-y: auto;
+    padding: 15px;
+    box-sizing: border-box;
+    font-size: 13px;
+    color: #222;
+  }
+
+  .screen::-webkit-scrollbar {
+    width: 5px;
+  }
+  .screen::-webkit-scrollbar-thumb {
+    background: #999;
+    border-radius: 3px;
+  }
+
+  .button-img {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #222;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 8px;
+    margin: 6px 0;
+    width: 100%;
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  .button-img img {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+  }
+
+  .button-img:hover { background-color: #444; }
+
+  .hidden { display: none; }
+
+  input, textarea {
+    width: 100%;
+    margin: 8px 0;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+
+  #qr-code { margin: 10px 0; text-align: center; }
+  #qr-code img { border-radius: 12px; width: 160px; height: 160px; }
+
+  /* 🗺️ Mapa con tamaño fijo y popups visibles */
+  #map {
+    height: 200px;
+    border-radius: 14px;
+    margin-top: 12px;
+    z-index: 1;
+  }
+
+  .leaflet-pane, .leaflet-popup-pane {
+    z-index: 9999 !important;
+  }
+
+  /* 📜 Licencia al fondo */
+  .license {
+    position: absolute;
+    bottom: 6px;
+    left: 14px;
+    font-size: 10px;
+    color: #555;
+    opacity: 0.9;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+  <div class="button-volume vol-up" title="Volumen +" onclick="buttonPress('Volumen +')"></div>
+  <div class="button-volume vol-down" title="Volumen -" onclick="buttonPress('Volumen -')"></div>
+  <div class="button-power" title="Power" onclick="buttonPress('Power')"></div>
+
+  <div class="dynamic-island">
+    <div class="camera"></div>
+  </div>
+
+  <div class="screen">
+    <div id="home-screen">
+      <h2>Bienvenido a AutentiTrack</h2>
+      <p>Protege la autenticidad del diseño y descubre obras originales con solo escanear.</p>
+      <button class="button-img" onclick="showScreen('designer-screen')">
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Diseñador"> Soy Diseñador
+      </button>
+      <button class="button-img" onclick="showScreen('user-screen')">
+        <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" alt="Usuario"> Soy Usuario
+      </button>
+    </div>
+
+    <div id="designer-screen" class="hidden">
+      <h2>Registrar diseño</h2>
+      <input type="text" id="designName" placeholder="Nombre del diseño" />
+      <input type="text" id="designerName" placeholder="Nombre del diseñador" />
+      <textarea id="desc" placeholder="Descripción de la prenda"></textarea>
+      <button class="button-img" onclick="generateQR()">
+        <img src="https://cdn-icons-png.flaticon.com/512/833/833314.png" alt="QR"> Generar QR
+      </button>
+      <div id="qr-code"></div>
+      <button class="button-img" onclick="showScreen('home-screen')">
+        <img src="https://cdn-icons-png.flaticon.com/512/93/93634.png" alt="Volver"> ← Volver
+      </button>
+    </div>
+
+    <div id="user-screen" class="hidden">
+      <h2>Verificar autenticidad</h2>
+      <button class="button-img" onclick="alert('Función escanear QR aún no implementada')">
+        <img src="https://cdn-icons-png.flaticon.com/512/753/753345.png" alt="Escanear"> Escanear QR
+      </button>
+      <button class="button-img" onclick="showScreen('map-screen')">
+        <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="Mapa"> Mapa de tiendas
+      </button>
+      <button class="button-img" onclick="showScreen('home-screen')">
+        <img src="https://cdn-icons-png.flaticon.com/512/93/93634.png" alt="Volver"> ← Volver
+      </button>
+    </div>
+
+    <div id="map-screen" class="hidden">
+      <h2>Tiendas Autorizadas - Bogotá</h2>
+      <div id="map"></div>
+      <button class="button-img" onclick="backToUser()">
+        <img src="https://cdn-icons-png.flaticon.com/512/93/93634.png" alt="Volver"> ← Volver
+      </button>
+    </div>
+
+    <!-- 📜 Licencia -->
+    <div class="license">Licencia GPL v3 ©️ 2025</div>
+  </div>
+</div>
+
+<script>
+  const db = {};
+
+  function buttonPress(name) {
+    alert(`Botón ${name} presionado`);
+  }
+
+  function showScreen(screenId) {
+    ['home-screen','designer-screen','user-screen','map-screen'].forEach(id => {
+      document.getElementById(id).classList.toggle('hidden', id !== screenId);
+    });
+    if(screenId === 'map-screen'){ 
+      setTimeout(initMap, 300);
+    }
+  }
+
+  function backToUser() {
+    document.getElementById('map-screen').classList.add('hidden');
+    document.getElementById('user-screen').classList.remove('hidden');
+  }
+
+  function generateQR(){
+    const name = document.getElementById('designName').value.trim();
+    const designer = document.getElementById('designerName').value.trim();
+    const desc = document.getElementById('desc').value.trim();
+    if(!name || !designer){ alert("Completa los campos"); return; }
+
+    const code = "QR-" + Math.random().toString(36).substr(2,8);
+    db[code] = { name, designer, desc };
+
+    const qr = new QRious({ value: code, size: 160, backgroundAlpha:1, foreground:"#222" });
+    document.getElementById('qr-code').innerHTML = `
+      <h4>Tu código QR:</h4>
+      <img src="${qr.toDataURL()}" alt="QR Code" />
+      <p><b>${code}</b></p>
+    `;
+  }
+
+  let mapInstance = null;
+  function initMap(){
+    if(mapInstance) return;
+    mapInstance = L.map('map', { zoomControl: false }).setView([4.7110,-74.0721],12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(mapInstance);
+
+    const stores = [
+      {name:"Tienda A", lat:4.7090, lng:-74.0720},
+      {name:"Tienda B", lat:4.7150, lng:-74.0800},
+      {name:"Tienda C", lat:4.7200, lng:-74.0600},
+    ];
+
+    stores.forEach(s => {
+      L.marker([s.lat, s.lng])
+        .addTo(mapInstance)
+        .bindPopup(`<b>${s.name}</b><br>Distribuidor autorizado`);
+    });
+  }
+</script>
+
+</body>
+</html>
